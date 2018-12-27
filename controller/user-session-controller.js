@@ -1,13 +1,23 @@
 const express = require('express');
 const pg = require('pg');
 const connectionString = 'postgres://localhost:5432/postgres';
-const client = new pg.Client({
+ const client = new pg.Client({
+    user: 'postgres',
+    host: 'localhost',
+    database: 'postgres',
+    password: 'aspire@123',
+    port: 5432
+ });
+var config = {
    user: 'postgres',
    host: 'localhost',
-   database: 'postgres',
-   password: 'aspire@123',
-   port: 5432
-});
+   database: 'postgres', 
+   password: 'aspire@123', 
+   port: 5432, 
+   max: 10, // max number of connection can be open to database
+   idleTimeoutMillis: 30000, // how long a client is allowed to remain idle before being closed
+ };
+ var pool = new pg.Pool(config);
 // const bodyParser = require('body-parser');
 const http = require('http');
 const app = express();
@@ -90,30 +100,51 @@ console.log("user session controller");
      });
  });
 
-router.get('/fetchAudit', (req,res)=>{
-   console.log('fetching audit detaiils');
-   //  client.connect();
-   //  let results = [];
-   //  const query = client.query('SELECT * FROM public.report_details');
-   // // Stream results back one row at a time
-   //  query.on('row', (row) => {
-   //     results.push(row);
-   //   });
+// function getResults(req,res){
+//    client.connect();
+//      let results = [];
+//      const query = client.query('SELECT * FROM public.report_details');
+//     // Stream results back one row at a time
+//      query.on('row', (row) => {
+//         results.push(row);
+//       });
      
-   //   // After all data is returned, close connection and return results
-   //   query.on('end', () => {
-   //    //done();
-   //     return res.json(results);
-   //   });
-   audit.find({},(err,data)=>{
-       console.log('fecthing audit records '+ data);
-       if(data){
-          res.send(data);
-       }else{
-          console.log('No records Found');
-          res.send(data);
-       }
+//       // After all data is returned, close connection and return results
+//       query.on('end', () => {
+//          //done();
+//          return res.json(results);
+//          // setTimeout(() => {
+//          //    //client.end();
+//          //    //document()
+            
+//          // }, 1200);
+         
+//       });
+// }
+
+router.get('/fetchAudit', function (req, res) {
+   pool.query("SELECT rj.id as Job_Id, (case when le.id>0 then 'Failure' else 'Success' end) as status, rj.owner, rj.label, rj.description, rj.creation_date, rj.report_unit_uri, rj.base_output_name FROM public.jireportjob rj left join jilogevent le on rj.report_unit_uri = le.resource_uri and le.event_text like '%ID: '||rj.id||')%'", 
+   (error, results) => {
+      if (error) {
+        throw error
+      }
+      res.status(200).json(results.rows);
     })
+});
+
+router.get('/fetchAuditDetails', (req,res)=>{
+   console.log('fetching audit detaiils');
+   getResults(req,res);
+   //res.send(results);
+   // audit.find({},(err,data)=>{
+   //     console.log('fecthing audit records '+ data);
+   //     if(data){
+   //        res.send(data);
+   //     }else{
+   //        console.log('No records Found');
+   //        res.send(data);
+   //     }
+   //  })
 })
 
 router.post('/fetchFields',(req,res)=>{

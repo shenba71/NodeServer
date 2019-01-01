@@ -123,7 +123,7 @@ console.log("user session controller");
 // }
 
 router.get('/fetchAudit', function (req, res) {
-   pool.query("SELECT rj.id as Job_Id, (case when le.id>0 then 'Failure' else 'Success' end) as status, rj.owner, rj.label, rj.description, rj.creation_date, rj.report_unit_uri, rj.base_output_name FROM public.jireportjob rj left join jilogevent le on rj.report_unit_uri = le.resource_uri and le.event_text like '%ID: '||rj.id||')%'", 
+   pool.query("SELECT rj.id as Job_Id, (case when le.id>0 and rj.creation_date < now() then 'Failure' when rj.creation_date > now() then 'Scheduled' else 'Success' end) as status, rj.label, rj.creation_date, rj.base_output_name,(case when rj.content_destination > 0 then 'true' else 'false' end) as is_ftp_enabled,(case when rj.mail_notification > 0 then 'true' else 'false' end) as is_mail_enabled FROM public.jireportjob rj left join jilogevent le on rj.report_unit_uri = le.resource_uri and le.event_text like '%ID: '||rj.id||')%'", 
    (error, results) => {
       if (error) {
         throw error

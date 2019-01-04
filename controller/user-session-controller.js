@@ -11,9 +11,9 @@ const connectionString = 'postgres://localhost:5432/postgres';
 var config = {
    user: 'postgres',
    host: 'localhost',
-   database: 'postgres', 
-   password: 'aspire@123', 
-   port: 5432, 
+   database: 'jasperserver', 
+   password: 'postgres', 
+   port: 5434, 
    max: 10, // max number of connection can be open to database
    idleTimeoutMillis: 30000, // how long a client is allowed to remain idle before being closed
  };
@@ -100,6 +100,10 @@ console.log("user session controller");
      });
  });
 
+ function isValidDate(date) {
+   return date && Object.prototype.toString.call(date) === "[object Date]" && !isNaN(date);
+ }
+
 // function getResults(req,res){
 //    client.connect();
 //      let results = [];
@@ -123,12 +127,23 @@ console.log("user session controller");
 // }
 
 router.get('/fetchAudit', function (req, res) {
-   pool.query("SELECT rj.id as Job_Id, (case when le.id>0 and rj.creation_date < now() then 'Failure' when rj.creation_date > now() then 'Scheduled' else 'Success' end) as status, rj.label, rj.creation_date, rj.base_output_name,(case when rj.content_destination > 0 then 'true' else 'false' end) as is_ftp_enabled,(case when rj.mail_notification > 0 then 'true' else 'false' end) as is_mail_enabled FROM public.jireportjob rj left join jilogevent le on rj.report_unit_uri = le.resource_uri and le.event_text like '%ID: '||rj.id||')%'", 
+   pool.query("SELECT rj.id AS Job_Id, rj.label as Job_Name, rj.base_output_name as Report_Name, (case	when qt.prev_fire_time = -1 then null else to_timestamp(qt.prev_fire_time / 1000)::timestamp without time zone end )Last_Run_Time,	( CASE WHEN le.id > 0 AND rj.creation_date < Now() THEN 'Failure' WHEN qt.prev_fire_time = -1 THEN 'Scheduled' ELSE 'Success' END ) AS status, to_timestamp(qt.next_fire_time / 1000)::timestamp without time zone Next_Run_Time, ( CASE WHEN rj.content_destination > 0 and jrd.server_name is not null THEN 'true' ELSE 'false' END ) AS Is_FTP_Enabled, ( CASE WHEN rj.mail_notification > 0 THEN 'true' ELSE 'false' END ) AS Is_Notification_Enabled FROM  public.jireportjob rj  left join jilogevent le ON rj.report_unit_uri = le.resource_uri AND le.event_text LIKE '%ID: ' ||rj.id ||')%' left join public.qrtz_triggers qt on concat('job_',rj.id::text) = qt.job_name left join public.jireportjobmailrecipient jmr	on rj.mail_notification = jmr.destination_id and recipient_type=1 left join jireportjobrepodest jrd on rj.content_destination = jrd.id;", 
    (error, results) => {
       if (error) {
         throw error
       }
-      res.status(200).json(results.rows);
+      var rows = results.rows;
+      for (var i = 0; i< rows.length; i++){
+         for( var j in rows[i] ) {
+         if (rows[i].hasOwnProperty(j)) {
+            if(isValidDate(rows[i][j])) {
+            rows[i][j] = rows[i][j].toLocaleString();
+           }
+            
+         }
+      }
+   }
+      res.status(200).json(rows);
     })
 });
 
